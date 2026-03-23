@@ -1,0 +1,4 @@
+/.qodo
+/__pycache__
+/setup_test_env.py
+/teardown_test_env.py
