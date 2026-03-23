@@ -21,7 +21,6 @@ from typing import Any, Dict, Iterable, List, Optional
 import boto3
 from botocore.exceptions import ClientError, EndpointConnectionError, NoCredentialsError
 
-
 @dataclass
 class Finding:
     """This is what one of the security findings looks like, can be expanded with further fields"""
@@ -105,12 +104,23 @@ SEVERITY_COLORS = {
 RESET = "\033[0m"
 
 
-def _get_instance_name(instance: Dict[str, Any]) -> Optional[str]:
-    """Pull the Name tag from an instance, if present."""
+# Cache instance name lookups
+_instance_name_cache: Dict[str, Optional[str]] = {}
+
+def _get_instance_name_cached(instance: Dict[str, Any]) -> Optional[str]:
+    """Cache instance name lookups to avoid repeated tag scanning."""
+    instance_id = instance.get("InstanceId")
+    if instance_id in _instance_name_cache:
+        return _instance_name_cache[instance_id]
+    
+    name = None
     for tag in instance.get("Tags", []):
         if tag.get("Key") == "Name":
-            return tag.get("Value")
-    return None
+            name = tag.get("Value")
+            break
+    
+    _instance_name_cache[instance_id] = name
+    return name
 
 
 def check_imdsv1(session: boto3.Session) -> List[Finding]:
@@ -131,7 +141,7 @@ def check_imdsv1(session: boto3.Session) -> List[Finding]:
             http_tokens = metadata_opts.get("HttpTokens", "optional")
 
             if http_tokens != "required":
-                name = _get_instance_name(inst)
+                name = _get_instance_name_cached(inst)
                 findings.append(
                     Finding(
                         title="IMDSv1 Enabled (IMDSv2 Not Enforced)",
@@ -435,7 +445,7 @@ def check_public_ips(session: boto3.Session) -> List[Finding]:
             instance_id = inst.get("InstanceId", "unknown")
             public_ip = inst.get("PublicIpAddress")
             if public_ip:
-                name = _get_instance_name(inst)
+                name = _get_instance_name_cached(inst)
                 findings.append(
                     Finding(
                         title="EC2 Instance Has a Public IP Address",

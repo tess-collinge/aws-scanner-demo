@@ -50,72 +50,56 @@ python ec2_misconfig_scanner.py
 ## Example Output
 
 ```
-[+] Authenticated as: arn:aws:iam::123456789012:user/test-user
-[+] Account: 123456789012
-[+] Region:  us-east-1
-
-[*] Running check: IMDSv1 Configuration...
-    Found 2 issue(s).
-[*] Running check: Security Group Rules...
-    Found 3 issue(s).
-[*] Running check: EC2 IAM Role Permissions...
-    Found 1 issue(s).
-[*] Running check: EBS Volume Encryption...
-    Found 4 issue(s).
-[*] Running check: Public IP Exposure...
-    Found 2 issue(s).
-
 ========================================================================
   EC2 MISCONFIGURATION SCAN RESULTS
-  2026-03-22 12:14:32 UTC
+  2026-03-23 05:17:49 UTC
 ========================================================================
 
-  Total findings: 12
-    CRITICAL: 3
-    HIGH: 3
-    MEDIUM: 4
+  Total findings: 8
+    CRITICAL: 1
+    HIGH: 2
+    MEDIUM: 3
     LOW: 2
 
   [CRITICAL] Finding #1: IMDSv1 Enabled (IMDSv2 Not Enforced)
-    Resource:    i-0abc123def456 (web-server-prod) (EC2 Instance)
-    Description: Instance i-0abc123def456 has HttpTokens set to 'optional',
-                 meaning the legacy metadata service (IMDSv1) is still accessible.
-                 IMDSv1 is vulnerable to SSRF-based credential theft, as
-                 demonstrated in the 2019 Capital One breach.
-    Remediation: Enforce IMDSv2 by setting HttpTokens to 'required':
-                 aws ec2 modify-instance-metadata-options
-                 --instance-id i-0abc123def456 --http-tokens required
-                 --http-endpoint enabled
+    Resource:   RESOURCE_NAME (misconfig-test-instance) (EC2 Instance)
+    Description: Instance RESOURCE_NAME has HttpTokens set to 'optional', meaning the legacy metadata service (IMDSv1) is still accessible. IMDSv1 is vulnerable to SSRF-based credential theft.
+    Remediation: Enforce IMDSv2 by setting HttpTokens to 'required': aws ec2 modify-instance-metadata-options --instance-id RESOURCE_NAME --http-tokens required --http-endpoint enabled
 
   [HIGH] Finding #2: SSH (port 22) Open to Internet
-    Resource:    sg-0123456789abcdef (default) (EC2 Security Group)
-    Description: Security group sg-0123456789abcdef (default) allows inbound
-                 SSH traffic (port 22) from 0.0.0.0/0. This exposes the
-                 service to brute-force and scanning attacks.
-    Remediation: Restrict port 22 to known CIDR ranges (VPN, office IP).
-                 For SSH, consider replacing direct access with AWS Systems
-                 Manager Session Manager.
+    Resource:    OTHER_SECURITY_GROUP (launch-wizard-1) (EC2 Security Group)
+    Description: Security group OTHER_SECURITY_GROUP (launch-wizard-1) allows inbound SSH (port 22) from the internet.
+    Remediation: Restrict inbound access to known CIDRs; consider SSM Session Manager for SSH/RDP access.
 
-  ...
+  [HIGH] Finding #3: SSH (port 22) Open to Internet
+    Resource:    SECURITY_GROUP (misconfig-test-sg) (EC2 Security Group)
+    Description: Security group SECURITY_GROUP (misconfig-test-sg) allows inbound SSH (port 22) from the internet.
+    Remediation: Restrict inbound access to known CIDRs; consider SSM Session Manager for SSH/RDP access.
+
+  [MEDIUM] Finding #4: Unencrypted EBS Volume
+    Resource:    vol-06c32120ec2ce5a1f (attached to: OTHER_RESOURCE_NAME) (EBS Volume)
+    Description: EBS volume vol-06c32120ec2ce5a1f is not encrypted, increasing risk of data exposure.
+    Remediation: Enable EBS encryption by default and replace the volume with an encrypted snapshot copy.
+
+  [MEDIUM] Finding #5: Unencrypted EBS Volume
+    Resource:    vol-043b647204386b741 (attached to: unattached) (EBS Volume)
+    Description: EBS volume vol-043b647204386b741 is not encrypted, increasing risk of data exposure.
+    Remediation: Enable EBS encryption by default and replace the volume with an encrypted snapshot copy.
+
+  [MEDIUM] Finding #6: Unencrypted EBS Volume
+    Resource:    vol-03f6eecad9c4c67fe (attached to: RESOURCE_NAME) (EBS Volume)
+    Description: EBS volume vol-03f6eecad9c4c67fe is not encrypted, increasing risk of data exposure.
+    Remediation: Enable EBS encryption by default and replace the volume with an encrypted snapshot copy.
+
+  [LOW] Finding #7: EC2 Instance Has a Public IP Address
+    Resource:    OTHER_RESOURCE_NAME (test) (EC2 Instance)
+    Description: Instance OTHER_RESOURCE_NAME has public IP [IP], which may be unnecessary.
+    Remediation: Move the instance to a private subnet or use NAT for egress-only access.
+
+  [LOW] Finding #8: EC2 Instance Has a Public IP Address
+    Resource:    RESOURCE_NAME (misconfig-test-instance) (EC2 Instance)
+    Description: Instance RESOURCE_NAME has public IP [IP], which may be unnecessary.
+    Remediation: Move the instance to a private subnet or use NAT for egress-only access.
+
 ========================================================================
-```
-
-With `--json`, you get something like:
-
-```json
-{
-  "scan_time": "2026-03-22T12:18:03Z",
-  "total_findings": 12,
-  "findings": [
-    {
-      "title": "IMDSv1 Enabled (IMDSv2 Not Enforced)",
-      "severity": "CRITICAL",
-      "resource_id": "i-0abc123def456 (web-server-prod)",
-      "resource_type": "EC2 Instance",
-      "description": "Instance i-0abc123def456 has HttpTokens set to ...",
-      "remediation": "Enforce IMDSv2 by setting HttpTokens to 'required': ...",
-      "timestamp": "2026-03-22T14:30:00Z"
-    }
-  ]
-}
 ```
